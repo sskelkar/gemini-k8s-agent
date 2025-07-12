@@ -17,16 +17,18 @@ The agent follows a three-step, read-only process:
 
 2.  **Gather Forensic Data:**
     *   For each unhealthy pod, the agent automatically collects the standard set of diagnostic information that a human operator would, including:
-        *   **Associated Events:** All recent events related to the pod.
+        *   **Associated Pod Events:** All recent events related to the pod.
         *   **Container Logs:** The logs from the most recent **crashed** (`--previous`) container instance, which is critical for diagnosing crash loops.
+        *   **Node Information:** Details about the cluster nodes, including their status, conditions (e.g., `MemoryPressure`, `DiskPressure`), allocatable/capacity resources, and taints.
+        *   **Node Events:** Recent events related to nodes (e.g., `NodeNotReady`, `NodeLost`).
 
 3.  **Provide a Rule-Based and LLM-Powered Diagnosis:**
     *   The agent analyzes the collected data to provide a high-level, plain-language diagnosis for the likely cause of the issue.
     *   The diagnosis is primarily based on a series of rules that check for common failure patterns:
         *   **High-Confidence Reasons:** Checks for `OOMKilled` or `ImagePullBackOff` in the container's state.
-        *   **Infrastructure Issues:** Scans pod events for keywords like `FailedScheduling` or `FailedMount`.
+        *   **Infrastructure Issues:** Scans pod and node events for keywords like `FailedScheduling`, `FailedMount`, `NodeNotReady`, or `NodeLost`.
         *   **Application Errors:** Scans container logs for common errors like `connection refused` or `file not found`.
-    *   **LLM Fallback:** For complex or ambiguous errors that do not match pre-defined rules, the agent escalates the issue to a Large Language Model (LLM) (currently `gemini-2.0-flash`). It sends the collected forensic data in a detailed prompt and returns the LLM's analysis to the user.
+    *   **LLM Fallback:** For complex or ambiguous errors that do not match pre-defined rules, the agent escalates the issue to a Large Language Model (LLM) (currently `gemini-2.0-flash`). It sends the collected forensic data, including pod and node information, in a detailed prompt and returns the LLM's analysis to the user.
 
 ## 3. Operational Requirements
 
@@ -40,7 +42,6 @@ The agent follows a three-step, read-only process:
     *   The `GEMINI_API_KEY` for LLM access must be provided in a `.env` file in the project root. This file is excluded from version control.
 
 ## 4. Out of Scope
-
 *   Automated remediation or any write actions against the cluster.
 *   Deployment of the agent as a pod within the Kubernetes cluster.
 
