@@ -3,6 +3,7 @@ import os
 from kubernetes import client, config
 from dotenv import load_dotenv
 import google.generativeai as genai
+from node_collector import NodeCollector
 
 # --- Configuration ---
 EXPECTED_CLUSTER_NAME = "staging"
@@ -26,6 +27,9 @@ class KubernetesDiagnosticAgent:
         self.v1_api = None
         self.pods = []
         self.llm_model = genai.GenerativeModel('gemini-2.0-flash')
+        # NodeCollector needs v1_api, which is initialized in _connect_and_validate
+        # So, we'll initialize it after v1_api is ready.
+        self.node_collector = None
 
     def _connect_and_validate(self):
         """Establishes connection to the Kubernetes cluster and validates the context."""
@@ -44,6 +48,7 @@ class KubernetesDiagnosticAgent:
             print(f"Successfully validated connection to '{current_cluster_name}' cluster.")
             config.load_kube_config(config_file=KUBECONFIG_PATH, context=active_context['name'])
             self.v1_api = client.CoreV1Api()
+            self.node_collector = NodeCollector(self.v1_api) # Initialize NodeCollector here
         except FileNotFoundError:
             raise ConnectionError(f"Kubeconfig file not found at '{KUBECONFIG_PATH}'")
         except Exception as e:
@@ -57,7 +62,6 @@ class KubernetesDiagnosticAgent:
         
         label_selector = ",".join([f"{key}={value}" for key, value in labels.items()])
         print(f"\nSearching for pods in namespace '{self.namespace}' with label selector '{label_selector}'...")
-        
         try:
             pod_list = self.v1_api.list_namespaced_pod(self.namespace, label_selector=label_selector)
             self.pods = pod_list.items
@@ -70,16 +74,19 @@ class KubernetesDiagnosticAgent:
     def analyze_pods(self):
         """Analyzes the health of discovered pods and prints diagnostics."""
         print(f"Found {len(self.pods)} matching pods. Analyzing health...\n")
+
+        node_diagnostics = self.node_collector.get_node_diagnostics()
+        
+
         for pod in self.pods:
             is_healthy, reason = self._is_pod_healthy(pod)
             if is_healthy:
                 print(f"- [HEALTHY] {pod.metadata.name}")
             else:
                 print(f"- [UNHEALTHY] {pod.metadata.name} - Reason: {reason}")
-                diagnostics = self._get_pod_diagnostics(pod)
+                pod_diagnostics = self._get_pod_diagnostics(pod)
                 
-                
-                diagnosis, recommendation = self._generate_diagnosis(pod, reason, diagnostics['events'], diagnostics['logs'])
+                diagnosis, recommendation = self._generate_diagnosis(pod, reason, pod_diagnostics['events'], pod_diagnostics['logs'], node_diagnostics)
                 print("\n  ==================== DIAGNOSIS ====================")
                 print(f"  Diagnosis:      {diagnosis}")
                 print(f"  Recommendation: {recommendation}")
@@ -147,41 +154,9 @@ class KubernetesDiagnosticAgent:
 
         return diagnostics
 
-    def _get_llm_diagnosis(self, pod, reason, pod_events, container_logs):
+    def _get_llm_diagnosis(self, pod, reason, pod_events, container_logs, node_diagnostics):
         """Sends diagnostic data to an LLM for analysis."""
         print("  Escalating to LLM for advanced analysis...")
-        
-        container_statuses = ""
-        if pod.status.container_statuses:
-            for cs in pod.status.container_statuses:
-                container_statuses += f"- Container: {cs.name}, Ready: {cs.ready}, State: {cs.state}\n"
-
-        prompt = f"""
-You are an expert Kubernetes reliability engineer. Your task is to analyze the following diagnostic data from an unhealthy pod and determine the most likely root cause.
-
-**Pod Details:**
-- Name: {pod.metadata.name}
-- Namespace: {pod.metadata.namespace}
-- Status: {pod.status.phase}
-- Reason for Unhealthiness: {reason}
-- Container Statuses: 
-{container_statuses}
-
-**Associated Pod Events:**
-```
-{pod_events}
-```
-
-**Crashed Container Logs (from previous instance):**
-```
-{container_logs}
-```
-
-**Analysis Request:**
-Based on the events and logs provided, what is the most likely root cause of this pod failure? Please provide a concise, one-paragraph explanation. Then, provide a one-sentence recommendation for how to fix it. Format the output as:
-Diagnosis: [Your one-paragraph diagnosis]
-Recommendation: [Your one-sentence recommendation]
-"""
         try:
             response = self.llm_model.generate_content(prompt)
             # Clean up the response text
@@ -221,10 +196,10 @@ Recommendation: [Your one-sentence recommendation]
         
         return None, None # No rule-based diagnosis found
 
-    def _generate_diagnosis(self, pod, unhealthy_reason, pod_events, container_logs):
+    def _generate_diagnosis(self, pod, unhealthy_reason, pod_events, container_logs, node_diagnostics):
         diagnosis, recommendation = self._get_rule_based_diagnosis(unhealthy_reason, pod_events, container_logs)
         if diagnosis:
             return diagnosis, recommendation
         
         # Fallback to LLM
-        return self._get_llm_diagnosis(pod, unhealthy_reason, pod_events, container_logs)
+        return self._get_llm_diagnosis(pod, unhealthy_reason, pod_events, container_logs, node_diagnostics)

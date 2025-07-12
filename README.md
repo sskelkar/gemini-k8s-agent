@@ -8,6 +8,7 @@ The project is split into two files:
 
 - `agent.py`: A reusable Python library containing the `KubernetesDiagnosticAgent` class, which encapsulates all the diagnostic logic.
 - `main.py`: The executable entry point for the tool. It handles command-line argument parsing and uses the `KubernetesDiagnosticAgent` class to run the diagnostics.
+- `node_collector.py`: A module responsible for collecting node-level information and events from the Kubernetes cluster.
 
 ## Features
 
@@ -16,10 +17,12 @@ The project is split into two files:
 - **Forensic Data Collection:** For any unhealthy pod, it automatically gathers:
     - Recent pod-level events.
     - Logs from any previously crashed containers.
+    - **Node Information:** Details about the cluster nodes, including their status, conditions (e.g., `MemoryPressure`, `DiskPressure`), allocatable/capacity resources, and taints.
+    - **Node Events:** Recent events related to nodes (e.g., `NodeNotReady`, `NodeLost`).
     This data is used internally for analysis and is not printed in full to the console.
 - **Automated Diagnosis (Rule-Based & LLM-Powered):**
     - Provides a concise, high-level diagnosis and a recommended next step based on common failure patterns.
-    - For complex or ambiguous errors, it escalates to a Large Language Model (LLM) (currently `gemini-2.0-flash`) to provide a more detailed analysis and recommendation.
+    - For complex or ambiguous errors, it escalates to a Large Language Model (LLM) (currently `gemini-2.0-flash`) to provide a more detailed analysis and recommendation, leveraging both pod and node-level forensic data.
 - **Safety First:**
     - The agent is **strictly read-only**.
     - It includes a safety check to ensure it only connects to the cluster name specified in its configuration.
@@ -33,7 +36,7 @@ The project is split into two files:
 
 ## Installation
 
-1.  **Clone the repository or download the `agent.py`, `main.py`, `requirements.txt`, and `.env` files.**
+1.  **Clone the repository or download the `agent.py`, `main.py`, `node_collector.py`, `requirements.txt`, and `.env` files.**
 
 2.  **Install the required Python packages:**
 
@@ -86,21 +89,4 @@ python3 main.py --app dashboard --country kr2 --namespace hurrier
 
 ```bash
 python3 main.py --app dashboard --country kr2 --fleet api --namespace hurrier
-```
-
-## Sample Output
-
-```
-Searching for pods in namespace 'my-namespace' with label selector 'app=my-app,country=my-country,fleet=my-fleet'...
-Found 2 matching pods. Analyzing health...
-
-- [UNHEALTHY] pod-name-xyz-12345-abcde - Reason: Container 'my-container-staging' is in a waiting state with reason: CrashLoopBackOff
-  Escalating to LLM for advanced analysis...
-
-  ==================== DIAGNOSIS ====================
-  Diagnosis:      The pod is in a CrashLoopBackOff state because the container `my-container-staging` is failing to start. The logs indicate that the application is unable to connect to the PostgreSQL database because the hostname `db-hostname.example.com` cannot be resolved. This suggests a DNS resolution issue, likely due to a misconfigured DNS entry, incorrect hostname, or network connectivity problem preventing the pod from resolving the database host.
-  Recommendation: Verify the correctness and availability of the DNS record for `db-hostname.example.com` and ensure the pod has proper network connectivity to resolve it.
-  =================================================
-
-- [HEALTHY] pod-name-xyz-67890-klmno
 ```
