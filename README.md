@@ -16,8 +16,9 @@ The project is split into two files:
 - **Forensic Data Collection:** For any unhealthy pod, it automatically gathers:
     - Recent pod-level events.
     - Logs from any previously crashed containers.
+    This data is used internally for analysis and is not printed in full to the console.
 - **Automated Diagnosis (Rule-Based & LLM-Powered):**
-    - Provides a rule-based diagnosis and a recommended next step based on common failure patterns.
+    - Provides a concise, high-level diagnosis and a recommended next step based on common failure patterns.
     - For complex or ambiguous errors, it escalates to a Large Language Model (LLM) (currently `gemini-2.0-flash`) to provide a more detailed analysis and recommendation.
 - **Safety First:**
     - The agent is **strictly read-only**.

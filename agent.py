@@ -77,12 +77,7 @@ class KubernetesDiagnosticAgent:
             else:
                 print(f"- [UNHEALTHY] {pod.metadata.name} - Reason: {reason}")
                 diagnostics = self._get_pod_diagnostics(pod)
-                indented_events = diagnostics['events'].replace('\n', '\n    ')
-                indented_logs = diagnostics['logs'].replace('\n', '\n    ')
-                print("  \n  Recent Events:")
-                print(f"    {indented_events}")
-                print("  \n  Logs from Crashed Containers:")
-                print(f"    {indented_logs}")
+                
                 
                 diagnosis, recommendation = self._generate_diagnosis(pod, reason, diagnostics['events'], diagnostics['logs'])
                 print("\n  ==================== DIAGNOSIS ====================")
