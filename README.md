@@ -87,3 +87,20 @@ python3 main.py --app dashboard --country kr2 --namespace hurrier
 ```bash
 python3 main.py --app dashboard --country kr2 --fleet api --namespace hurrier
 ```
+
+## Sample Output
+
+```
+Searching for pods in namespace 'my-namespace' with label selector 'app=my-app,country=my-country,fleet=my-fleet'...
+Found 2 matching pods. Analyzing health...
+
+- [UNHEALTHY] pod-name-xyz-12345-abcde - Reason: Container 'my-container-staging' is in a waiting state with reason: CrashLoopBackOff
+  Escalating to LLM for advanced analysis...
+
+  ==================== DIAGNOSIS ====================
+  Diagnosis:      The pod is in a CrashLoopBackOff state because the container `my-container-staging` is failing to start. The logs indicate that the application is unable to connect to the PostgreSQL database because the hostname `db-hostname.example.com` cannot be resolved. This suggests a DNS resolution issue, likely due to a misconfigured DNS entry, incorrect hostname, or network connectivity problem preventing the pod from resolving the database host.
+  Recommendation: Verify the correctness and availability of the DNS record for `db-hostname.example.com` and ensure the pod has proper network connectivity to resolve it.
+  =================================================
+
+- [HEALTHY] pod-name-xyz-67890-klmno
+```
