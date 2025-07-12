@@ -1,9 +1,21 @@
 import sys
+import os
 from kubernetes import client, config
+from dotenv import load_dotenv
+import google.generativeai as genai
 
 # --- Configuration ---
 EXPECTED_CLUSTER_NAME = "staging"
 KUBECONFIG_PATH = "~/.kube_tool/staging-eu"
+
+# --- LLM Configuration ---
+load_dotenv()
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if not GEMINI_API_KEY:
+    print("Error: GEMINI_API_KEY not found in .env file.", file=sys.stderr)
+    sys.exit(1)
+genai.configure(api_key=GEMINI_API_KEY)
+
 
 class KubernetesDiagnosticAgent:
     def __init__(self, namespace, app_label, country_label, fleet_label=None):
@@ -13,6 +25,7 @@ class KubernetesDiagnosticAgent:
         self.fleet_label = fleet_label
         self.v1_api = None
         self.pods = []
+        self.llm_model = genai.GenerativeModel('gemini-2.0-flash')
 
     def _connect_and_validate(self):
         """Establishes connection to the Kubernetes cluster and validates the context."""
@@ -71,7 +84,7 @@ class KubernetesDiagnosticAgent:
                 print("  \n  Logs from Crashed Containers:")
                 print(f"    {indented_logs}")
                 
-                diagnosis, recommendation = self._generate_diagnosis(reason, diagnostics['events'], diagnostics['logs'])
+                diagnosis, recommendation = self._generate_diagnosis(pod, reason, diagnostics['events'], diagnostics['logs'])
                 print("\n  ==================== DIAGNOSIS ====================")
                 print(f"  Diagnosis:      {diagnosis}")
                 print(f"  Recommendation: {recommendation}")
@@ -139,7 +152,54 @@ class KubernetesDiagnosticAgent:
 
         return diagnostics
 
-    def _generate_diagnosis(self, unhealthy_reason, pod_events, container_logs):
+    def _get_llm_diagnosis(self, pod, reason, pod_events, container_logs):
+        """Sends diagnostic data to an LLM for analysis."""
+        print("  Escalating to LLM for advanced analysis...")
+        
+        container_statuses = ""
+        if pod.status.container_statuses:
+            for cs in pod.status.container_statuses:
+                container_statuses += f"- Container: {cs.name}, Ready: {cs.ready}, State: {cs.state}\n"
+
+        prompt = f"""
+You are an expert Kubernetes reliability engineer. Your task is to analyze the following diagnostic data from an unhealthy pod and determine the most likely root cause.
+
+**Pod Details:**
+- Name: {pod.metadata.name}
+- Namespace: {pod.metadata.namespace}
+- Status: {pod.status.phase}
+- Reason for Unhealthiness: {reason}
+- Container Statuses: 
+{container_statuses}
+
+**Associated Pod Events:**
+```
+{pod_events}
+```
+
+**Crashed Container Logs (from previous instance):**
+```
+{container_logs}
+```
+
+**Analysis Request:**
+Based on the events and logs provided, what is the most likely root cause of this pod failure? Please provide a concise, one-paragraph explanation. Then, provide a one-sentence recommendation for how to fix it. Format the output as:
+Diagnosis: [Your one-paragraph diagnosis]
+Recommendation: [Your one-sentence recommendation]
+"""
+        try:
+            response = self.llm_model.generate_content(prompt)
+            # Clean up the response text
+            cleaned_text = response.text.replace("Diagnosis: ", "").replace("Recommendation: ", "\nRecommendation: ")
+            parts = cleaned_text.split("\nRecommendation:")
+            diagnosis = parts[0].strip()
+            recommendation = parts[1].strip() if len(parts) > 1 else "No specific recommendation provided."
+            return (diagnosis, recommendation)
+        except Exception as e:
+            return (f"LLM analysis failed: {e}", "Could not get a recommendation from the LLM.")
+
+
+    def _get_rule_based_diagnosis(self, unhealthy_reason, pod_events, container_logs):
         if "OOMKilled" in unhealthy_reason:
             return ("The container was terminated because it exceeded its memory limit.",
                     "Increase the memory limit for this pod in your deployment's resource requests/limits.")
@@ -163,9 +223,13 @@ class KubernetesDiagnosticAgent:
         if "permission denied" in container_logs.lower():
             return ("The application is crashing due to a file system permission error.",
                     "Check the user/group the container is running as and ensure it has correct permissions.")
+        
+        return None, None # No rule-based diagnosis found
 
-        if "CrashLoopBackOff" in unhealthy_reason:
-            return ("The container is crashing with an un-recognized application error.",
-                    "Please examine the container logs closely to identify the root cause of the stack trace or error message.")
-
-        return ("The pod is in an unhealthy state.", "Please review the pod events and container statuses for more specific clues.")
+    def _generate_diagnosis(self, pod, unhealthy_reason, pod_events, container_logs):
+        diagnosis, recommendation = self._get_rule_based_diagnosis(unhealthy_reason, pod_events, container_logs)
+        if diagnosis:
+            return diagnosis, recommendation
+        
+        # Fallback to LLM
+        return self._get_llm_diagnosis(pod, unhealthy_reason, pod_events, container_logs)

@@ -16,7 +16,9 @@ The project is split into two files:
 - **Forensic Data Collection:** For any unhealthy pod, it automatically gathers:
     - Recent pod-level events.
     - Logs from any previously crashed containers.
-- **Automated Diagnosis:** Provides a rule-based diagnosis and a recommended next step based on the collected data, helping to quickly identify common issues like `OOMKilled`, `ImagePullBackOff`, or application-level errors in the logs.
+- **Automated Diagnosis (Rule-Based & LLM-Powered):**
+    - Provides a rule-based diagnosis and a recommended next step based on common failure patterns.
+    - For complex or ambiguous errors, it escalates to a Large Language Model (LLM) (currently `gemini-2.0-flash`) to provide a more detailed analysis and recommendation.
 - **Safety First:**
     - The agent is **strictly read-only**.
     - It includes a safety check to ensure it only connects to the cluster name specified in its configuration.
@@ -26,23 +28,32 @@ The project is split into two files:
 - Python 3
 - `pip` for Python package installation
 - Access to a Kubernetes cluster with a valid `kubeconfig` file.
+- A Google Gemini API key.
 
 ## Installation
 
-1.  **Clone the repository or download the `agent.py` and `main.py` files.**
+1.  **Clone the repository or download the `agent.py`, `main.py`, `requirements.txt`, and `.env` files.**
 
-2.  **Install the required Python library:**
+2.  **Install the required Python packages:**
 
     ```bash
-    pip install kubernetes
+    pip install -r requirements.txt
     ```
 
 ## Configuration
 
-Before running, you must configure two variables at the top of the `agent.py` script:
+Before running, you must configure the following:
 
-- `EXPECTED_CLUSTER_NAME`: A critical safety feature. The script will abort if the active context in your `kubeconfig` does not match this name. **Default:** `"staging"`.
-- `KUBECONFIG_PATH`: The path to your `kubeconfig` file. **Default:** `"~/.kube_tool/staging-eu"`.
+- **`GEMINI_API_KEY`**: Obtain a Google Gemini API key and add it to the `.env` file in the project root. This file is excluded from version control for security.
+
+    ```
+    GEMINI_API_KEY='YOUR_API_KEY_HERE'
+    ```
+
+- **`EXPECTED_CLUSTER_NAME`**: A critical safety feature. The script will abort if the active context in your `kubeconfig` does not match this name. **Default:** `"staging"`.
+- **`KUBECONFIG_PATH`**: The path to your `kubeconfig` file. **Default:** `"~/.kube_tool/staging-eu"`.
+
+These last two variables are configured at the top of the `agent.py` script:
 
 **Example Configuration in `agent.py`:**
 ```python

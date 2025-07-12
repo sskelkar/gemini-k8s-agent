@@ -20,13 +20,13 @@ The agent follows a three-step, read-only process:
         *   **Associated Events:** All recent events related to the pod.
         *   **Container Logs:** The logs from the most recent **crashed** (`--previous`) container instance, which is critical for diagnosing crash loops.
 
-3.  **Provide a Rule-Based Diagnosis:**
+3.  **Provide a Rule-Based and LLM-Powered Diagnosis:**
     *   The agent analyzes the collected data to provide a high-level, plain-language diagnosis for the likely cause of the issue.
-    *   The diagnosis is based on a series of rules that check for common failure patterns:
+    *   The diagnosis is primarily based on a series of rules that check for common failure patterns:
         *   **High-Confidence Reasons:** Checks for `OOMKilled` or `ImagePullBackOff` in the container's state.
         *   **Infrastructure Issues:** Scans pod events for keywords like `FailedScheduling` or `FailedMount`.
         *   **Application Errors:** Scans container logs for common errors like `connection refused` or `file not found`.
-        *   **Fallback:** Provides a general diagnosis if no specific rule matches.
+    *   **LLM Fallback:** For complex or ambiguous errors that do not match pre-defined rules, the agent escalates the issue to a Large Language Model (LLM) (currently `gemini-2.0-flash`). It sends the collected forensic data in a detailed prompt and returns the LLM's analysis to the user.
 
 ## 3. Operational Requirements
 
@@ -37,6 +37,7 @@ The agent follows a three-step, read-only process:
     *   It includes a safety check to ensure it only connects to a specific, pre-configured cluster name.
 *   **Configuration:**
     *   The target `namespace`, `app` label (required), `country` label (required), and `fleet` label (optional) are provided via command-line arguments.
+    *   The `GEMINI_API_KEY` for LLM access must be provided in a `.env` file in the project root. This file is excluded from version control.
 
 ## 4. Out of Scope
 
@@ -45,4 +46,4 @@ The agent follows a three-step, read-only process:
 
 ## 5. Future Milestones
 
-*   **LLM-Powered Analysis:** For complex or ambiguous errors that do not match pre-defined rules, the agent could escalate the issue to a Large Language Model (LLM). It would send the collected forensic data in a detailed prompt and return the LLM's analysis to the user.
+*   (No future milestones currently defined, as LLM integration is complete.)
