@@ -157,6 +157,49 @@ class KubernetesDiagnosticAgent:
     def _get_llm_diagnosis(self, pod, reason, pod_events, container_logs, node_diagnostics):
         """Sends diagnostic data to an LLM for analysis."""
         print("  Escalating to LLM for advanced analysis...")
+        
+        container_statuses = ""
+        if pod.status.container_statuses:
+            for cs in pod.status.container_statuses:
+                container_statuses += f"- Container: {cs.name}, Ready: {cs.ready}, State: {cs.state}\n"
+
+        node_info_str = ""
+        for node in node_diagnostics["nodes"]:
+            node_info_str += f"- Node: {node['name']}, Status: {node['status']}, Conditions: {node['conditions']}, Taints: {node['taints']}\n"
+        
+        prompt = f"""
+You are an expert Kubernetes reliability engineer. Your task is to analyze the following diagnostic data from an unhealthy pod and determine the most likely root cause.
+
+**Pod Details:**
+- Name: {pod.metadata.name}
+- Namespace: {pod.metadata.namespace}
+- Status: {pod.status.phase}
+- Reason for Unhealthiness: {reason}
+- Container Statuses: 
+{container_statuses}
+
+**Associated Pod Events:**
+```
+{pod_events}
+```
+
+**Crashed Container Logs (from previous instance):**
+```
+{container_logs}
+```
+
+**Cluster Node Information:**
+```
+{node_info_str}
+```
+
+**Recent Node Events:**
+```
+{node_diagnostics["events"]}
+```
+
+**Analysis Request:**
+Based on the events and logs provided, what is the most likely root cause of this pod failure? Please provide a concise, one-paragraph explanation. Then, provide a one-sentence recommendation for how to fix it. Format the output as:\nDiagnosis: [Your one-paragraph diagnosis]\nRecommendation: [Your one-sentence recommendation]\n"""
         try:
             response = self.llm_model.generate_content(prompt)
             # Clean up the response text
