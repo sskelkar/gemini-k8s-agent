@@ -143,7 +143,7 @@ class KubernetesDiagnosticAgent:
                         namespace=pod.metadata.namespace,
                         container=cs.name,
                         previous=True,
-                        tail_lines=50
+                        
                     )
                     log_messages.append(f"--- Logs for container '{cs.name}' ---\n{logs}")
                 except client.ApiException:
