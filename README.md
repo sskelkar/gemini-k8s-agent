@@ -1,6 +1,6 @@
 # Kubernetes Diagnostic Agent
 
-This project provides a read-only, local diagnostic tool that connects to a Kubernetes cluster to identify and analyze unhealthy pods based on a set of labels.
+This project provides a read-only, local diagnostic tool that connects to a Kubernetes cluster to identify and analyze unhealthy pods based on a set of labels. The agent first collects forensic data about the pod and its node, including events, logs, and node status. It then uses a combination of rule-based analysis and a Large Language Model (LLM) to diagnose the root cause and suggest a solution.
 
 ## Architecture
 
