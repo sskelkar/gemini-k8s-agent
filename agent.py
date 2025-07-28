@@ -5,10 +5,6 @@ from dotenv import load_dotenv
 import google.generativeai as genai
 from node_collector import NodeCollector
 
-# --- Configuration ---
-EXPECTED_CLUSTER_NAME = "staging"
-KUBECONFIG_PATH = "~/.kube_tool/staging-eu"
-
 # --- LLM Configuration ---
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -19,11 +15,12 @@ genai.configure(api_key=GEMINI_API_KEY)
 
 
 class KubernetesDiagnosticAgent:
-    def __init__(self, namespace, app_label, country_label, fleet_label=None):
+    def __init__(self, namespace, app_label, country_label, fleet_label=None, cluster_name="staging-eu"):
         self.namespace = namespace
         self.app_label = app_label
         self.country_label = country_label
         self.fleet_label = fleet_label
+        self.cluster_name = cluster_name
         self.v1_api = None
         self.pods = []
         self.llm_model = genai.GenerativeModel('gemini-2.0-flash')
@@ -34,23 +31,19 @@ class KubernetesDiagnosticAgent:
     def _connect_and_validate(self):
         """Establishes connection to the Kubernetes cluster and validates the context."""
         try:
-            contexts, active_context = config.list_kube_config_contexts(config_file=KUBECONFIG_PATH)
+            kubeconfig_path = os.path.expanduser(f"~/.kube_tool/{self.cluster_name}")
+            contexts, active_context = config.list_kube_config_contexts(config_file=kubeconfig_path)
             if not active_context:
                 raise ConnectionError("No active context found in kubeconfig.")
 
             current_cluster_name = active_context['context']['cluster']
-            if current_cluster_name != EXPECTED_CLUSTER_NAME:
-                raise ConnectionError(
-                    f"This script is configured to run only against the '{EXPECTED_CLUSTER_NAME}' cluster, "
-                    f"but the current context is '{current_cluster_name}'. Aborting."
-                )
 
             print(f"Successfully validated connection to '{current_cluster_name}' cluster.")
-            config.load_kube_config(config_file=KUBECONFIG_PATH, context=active_context['name'])
+            config.load_kube_config(config_file=kubeconfig_path, context=active_context['name'])
             self.v1_api = client.CoreV1Api()
             self.node_collector = NodeCollector(self.v1_api) # Initialize NodeCollector here
         except FileNotFoundError:
-            raise ConnectionError(f"Kubeconfig file not found at '{KUBECONFIG_PATH}'")
+            raise ConnectionError(f"Kubeconfig file not found at '{kubeconfig_path}'")
         except Exception as e:
             raise ConnectionError(f"An unexpected error occurred during connection: {e}")
 

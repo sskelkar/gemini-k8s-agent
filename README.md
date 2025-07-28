@@ -25,7 +25,6 @@ The project is split into two files:
     - For complex or ambiguous errors, it escalates to a Large Language Model (LLM) (currently `gemini-2.0-flash`) to provide a more detailed analysis and recommendation, leveraging both pod and node-level forensic data.
 - **Safety First:**
     - The agent is **strictly read-only**.
-    - It includes a safety check to ensure it only connects to the cluster name specified in its configuration.
 
 ## Prerequisites
 
@@ -54,18 +53,6 @@ Before running, you must configure the following:
     GEMINI_API_KEY='YOUR_API_KEY_HERE'
     ```
 
-- **`EXPECTED_CLUSTER_NAME`**: A critical safety feature. The script will abort if the active context in your `kubeconfig` does not match this name. **Default:** `"staging"`.
-- **`KUBECONFIG_PATH`**: The path to your `kubeconfig` file. **Default:** `"~/.kube_tool/staging-eu"`.
-
-These last two variables are configured at the top of the `agent.py` script:
-
-**Example Configuration in `agent.py`:**
-```python
-# --- Configuration ---
-EXPECTED_CLUSTER_NAME = "staging"
-KUBECONFIG_PATH = "~/.kube_tool/staging-eu"
-```
-
 ## How to Run
 
 Execute the `main.py` script from your terminal, providing the required and optional arguments.
@@ -76,17 +63,18 @@ Execute the `main.py` script from your terminal, providing the required and opti
 - `--country` (required): The value for the `country` label.
 - `--fleet` (optional): The value for the `fleet` label.
 - `--namespace` (optional): The Kubernetes namespace to search in. Defaults to `default`.
+- `--cluster` (optional): The name of the Kubernetes cluster to connect to. Defaults to `staging-eu`. The script will look for a kubeconfig file at `~/.kube_tool/<cluster_name>`.
 
 ### Example Usage
 
-**1. Basic search for unhealthy pods:**
+**1. Basic search for unhealthy pods (using the default 'staging-eu' cluster):**
 
 ```bash
 python3 main.py --app dashboard --country kr2 --namespace hurrier
 ```
 
-**2. Search including the optional `fleet` label:**
+**2. Search on a specific cluster:**
 
 ```bash
-python3 main.py --app dashboard --country kr2 --fleet api --namespace hurrier
+python3 main.py --app dashboard --country kr2 --fleet api --namespace hurrier --cluster my-cluster
 ```

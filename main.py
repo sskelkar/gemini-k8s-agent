@@ -7,7 +7,8 @@ if __name__ == "__main__":
     parser.add_argument("--app", type=str, required=True, help="The 'app' label value.")
     parser.add_argument("--country", type=str, required=True, help="The 'country' label value.")
     parser.add_argument("--fleet", type=str, help="The 'fleet' label value (optional).")
+    parser.add_argument("--cluster", type=str, default="staging-eu", help="The name of the Kubernetes cluster to connect to.")
     args = parser.parse_args()
 
-    agent = KubernetesDiagnosticAgent(args.namespace, args.app, args.country, args.fleet)
+    agent = KubernetesDiagnosticAgent(args.namespace, args.app, args.country, args.fleet, args.cluster)
     agent.run()

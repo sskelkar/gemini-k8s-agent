@@ -33,12 +33,11 @@ The agent follows a three-step, read-only process:
 ## 3. Operational Requirements
 
 *   **Execution Environment:** The script runs on a user's local machine.
-*   **Authentication:** It uses a local `kubeconfig` file for cluster authentication.
+*   **Authentication:** It uses a local `kubeconfig` file for cluster authentication. The path to the kubeconfig file is constructed dynamically from the cluster name provided by the user (`~/.kube_tool/<cluster_name>`).
 *   **Safety:**
     *   The agent is **strictly read-only**. It does not perform any actions that modify cluster state.
-    *   It includes a safety check to ensure it only connects to a specific, pre-configured cluster name.
 *   **Configuration:**
-    *   The target `namespace`, `app` label (required), `country` label (required), and `fleet` label (optional) are provided via command-line arguments.
+    *   The target `namespace`, `app` label (required), `country` label (required), `fleet` label (optional), and `cluster` (optional, defaults to `staging-eu`) are provided via command-line arguments.
     *   The `GEMINI_API_KEY` for LLM access must be provided in a `.env` file in the project root. This file is excluded from version control.
 
 ## 4. Out of Scope
